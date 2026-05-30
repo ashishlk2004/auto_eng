@@ -1,0 +1,66 @@
+@namespace(uri="http://cs.york.ac.uk/eng2/rcl",prefix="r")
+package rcl;
+
+// Reactive Component Language (RCL) metamodel
+//
+// The home automation scenario is expressed as a Model containing reactive Components and
+// Kafka Topics. Each Component has one or more Triggers (time-based or topic-based) and may
+// produce records into one or more Topics. Each Topic owns one or more Slots, where each
+// slot is part of either the record's key or its body.
+
+enum SlotType {
+    integer = 0;
+    double  = 1;
+    string  = 2;
+    timestamp = 3;
+    long_ = 4;  // 'long' is a reserved Java keyword
+}
+
+enum SlotPart {
+    body = 0;
+    key  = 1;
+}
+
+enum TimeUnit {
+    seconds = 0;
+    minutes = 1;
+    hours   = 2;
+    days    = 3;
+}
+
+class Model {
+    val Component[*] components;
+    val Topic[*]     topics;
+}
+
+class Component {
+    attr String name;
+    val Trigger[1..*] triggers;
+    ref Topic[*] produces;
+}
+
+class Topic {
+    attr String name;
+    val Slot[1..*] slots;
+}
+
+class Slot {
+    attr String   name;
+    attr SlotType type;
+    attr SlotPart part;
+}
+
+abstract class Trigger { }
+
+class TimeTrigger extends Trigger {
+    val TimePeriod[1] period;
+}
+
+class TopicTrigger extends Trigger {
+    ref Topic[1] topic;
+}
+
+class TimePeriod {
+    attr int      value = 1;
+    attr TimeUnit unit;
+}

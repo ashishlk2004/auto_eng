@@ -1,0 +1,83 @@
+// --------------------------------------------------------------------------
+// EGX orchestrator: for each Topic in the RCL model, generate
+//   * a Kafka producer interface (regenerable, do not edit)
+//   * a Kafka topic factory bean (regenerable, do not edit)
+//   * a Kafka consumer class that extracts slots and triggers the
+//     components depending on this topic (regenerable, do not edit)
+// Option 1 from Section 1.2 of the brief: generation per topic. Each generated
+// class is in its own .java file, so re-running the generator simply overwrites
+// them. Manually-written code lives elsewhere, so nothing hand-written is lost.
+//
+// All naming is computed here (the toClassName helper is at the bottom) and
+// passed to the templates as parameters, so the EGL templates contain no custom
+// operations - they only interpolate values and use built-in string operations.
+// --------------------------------------------------------------------------
+
+pre {
+    var basePkg = "uk.ac.york.eng2.reactive.generated";
+    // NOTE: EOL's replace()/replaceAll() are regex-based, so a bare "." would match
+    // every character. Use the character class "[.]" to match a literal dot.
+    var basePath = basePkg.replaceAll("[.]", "/");
+}
+
+rule TopicProducer
+    transform t : Topic {
+
+    parameters : Map {
+        "topic" = t,
+        "basePackage" = basePkg,
+        "className" = t.name.toClassName() + "Producer",
+        "dtoName" = t.name.toClassName() + "Record"
+    }
+
+    template : "TopicProducer.egl"
+    target   : basePath + "/producers/" + t.name.toClassName() + "Producer.java"
+    overwrite: true
+}
+
+rule TopicFactory
+    transform t : Topic {
+
+    parameters : Map {
+        "topic" = t,
+        "basePackage" = basePkg,
+        "className" = t.name.toClassName() + "TopicFactory",
+        "beanName" = t.name.toClassName().firstToLowerCase()
+    }
+
+    template : "TopicFactory.egl"
+    target   : basePath + "/factories/" + t.name.toClassName() + "TopicFactory.java"
+    overwrite: true
+}
+
+rule TopicConsumer
+    transform t : Topic {
+
+    parameters : Map {
+        "topic" = t,
+        "basePackage" = basePkg,
+        "className" = t.name.toClassName() + "Consumer",
+        "dtoName" = t.name.toClassName() + "Record",
+        "groupId" = t.name.toClassName().toLowerCase() + "-consumer",
+        "consumers" = Component.all.select(c | c.triggers
+            .select(tr | tr.isKindOf(TopicTrigger))
+            .exists(tt | tt.topic = t))
+    }
+
+    template : "TopicConsumer.egl"
+    target   : basePath + "/consumers/" + t.name.toClassName() + "Consumer.java"
+    overwrite: true
+}
+
+// Helper used by the rules above to turn a dotted/hyphenated topic name into a
+// PascalCase Java identifier, e.g. "current.import.rate" -> "CurrentImportRate".
+operation String toClassName() : String {
+    var parts = self.replaceAll("[.-]", "_").split("_");
+    var sb : String = "";
+    for (p in parts) {
+        if (p.length() > 0) {
+            sb = sb + p.substring(0, 1).toUpperCase() + p.substring(1);
+        }
+    }
+    return sb;
+}

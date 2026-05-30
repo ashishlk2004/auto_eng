@@ -1,0 +1,22 @@
+package [%=basePackage%].factories;
+
+import io.micronaut.context.annotation.Factory;
+import jakarta.inject.Singleton;
+import org.apache.kafka.clients.admin.NewTopic;
+
+/**
+ * Auto-generated topic factory for <code>[%=topic.name%]</code>. Registers the
+ * topic so that Micronaut Kafka can create it on startup if it does not yet
+ * exist. Regenerated from the RCL model: do not edit by hand.
+ */
+@Factory
+public class [%=className%] {
+
+    public static final String TOPIC_NAME = "[%=topic.name%]";
+
+    @Singleton
+    public NewTopic [%=beanName%]Topic() {
+        // Single partition, replication factor 1 - tune for production.
+        return new NewTopic(TOPIC_NAME, 1, (short) 1);
+    }
+}

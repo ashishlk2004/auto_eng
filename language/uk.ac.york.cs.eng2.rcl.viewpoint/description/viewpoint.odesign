@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<description:Group xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI"
+    xmlns:description="http://www.eclipse.org/sirius/description/1.1.0"
+    xmlns:description_1="http://www.eclipse.org/sirius/diagram/description/1.1.0"
+    xmlns:style="http://www.eclipse.org/sirius/diagram/description/style/1.1.0"
+    xmlns:tool="http://www.eclipse.org/sirius/diagram/description/tool/1.1.0"
+    xmlns:tool_1="http://www.eclipse.org/sirius/description/tool/1.1.0"
+    name="viewpoint" version="12.0.0.2017041100">
+  <ownedViewpoints name="uk.ac.york.cs.eng2.rcl.viewpoint" label="Reactive Computation Viewpoint" modelFileExtension="rcl">
+    <ownedJavaExtensions qualifiedClassName="uk.ac.york.cs.eng2.rcl.viewpoint.Services"/>
+    <ownedRepresentations xsi:type="description_1:DiagramDescription"
+        name="RCL Diagram"
+        label="Reactive Components Diagram"
+        domainClass="rcl::Model"
+        enablePopupBars="true">
+      <metamodel href="http://cs.york.ac.uk/eng2/rcl#/"/>
+      <defaultLayer name="Default">
+
+        <!-- ============ NODE MAPPINGS ============ -->
+        <nodeMappings name="ComponentNode"
+            semanticCandidatesExpression="feature:components"
+            domainClass="rcl::Component">
+          <style xsi:type="style:SquareDescription"
+              labelExpression="feature:name"
+              labelAlignment="CENTER"
+              color="//@userColorsPalettes.0/@entries.0"
+              borderColor="//@userColorsPalettes.0/@entries.1"
+              borderSizeComputationExpression="2"
+              width="6" height="3">
+            <labelFormat>bold</labelFormat>
+          </style>
+        </nodeMappings>
+
+        <nodeMappings name="TopicNode"
+            semanticCandidatesExpression="feature:topics"
+            domainClass="rcl::Topic">
+          <style xsi:type="style:SquareDescription"
+              labelExpression="aql:'[topic] ' + self.name"
+              labelAlignment="CENTER"
+              color="//@userColorsPalettes.0/@entries.2"
+              borderColor="//@userColorsPalettes.0/@entries.1"
+              borderSizeComputationExpression="2"
+              width="6" height="3">
+            <labelFormat>italic</labelFormat>
+          </style>
+        </nodeMappings>
+
+        <!-- ============ EDGE MAPPINGS ============ -->
+        <edgeMappings name="ProducesEdge"
+            sourceMapping="//@ownedViewpoints[name='uk.ac.york.cs.eng2.rcl.viewpoint']/@ownedRepresentations[name='RCL%20Diagram']/@defaultLayer/@nodeMappings[name='ComponentNode']"
+            targetMapping="//@ownedViewpoints[name='uk.ac.york.cs.eng2.rcl.viewpoint']/@ownedRepresentations[name='RCL%20Diagram']/@defaultLayer/@nodeMappings[name='TopicNode']"
+            targetFinderExpression="feature:produces"
+            sourceFinderExpression="self">
+          <style routingStyle="manhattan"
+              strokeColor="//@userColorsPalettes.0/@entries.3">
+            <centerLabelStyleDescription labelExpression="aql:'produces'" showIcon="false"/>
+            <endCentered>SOURCE_ARROW</endCentered>
+            <endCentered>TARGET_ARROW</endCentered>
+          </style>
+        </edgeMappings>
+
+        <edgeMappings name="TriggersEdge"
+            sourceMapping="//@ownedViewpoints[name='uk.ac.york.cs.eng2.rcl.viewpoint']/@ownedRepresentations[name='RCL%20Diagram']/@defaultLayer/@nodeMappings[name='TopicNode']"
+            targetMapping="//@ownedViewpoints[name='uk.ac.york.cs.eng2.rcl.viewpoint']/@ownedRepresentations[name='RCL%20Diagram']/@defaultLayer/@nodeMappings[name='ComponentNode']"
+            targetFinderExpression="aql:self.eContainer().oclAsType(rcl::Model).components->select(c | c.triggers->exists(t | t.oclIsKindOf(rcl::TopicTrigger) and (t.oclAsType(rcl::TopicTrigger).topic = self)))"
+            sourceFinderExpression="self">
+          <style routingStyle="manhattan"
+              strokeColor="//@userColorsPalettes.0/@entries.4">
+            <centerLabelStyleDescription labelExpression="aql:'triggers'" showIcon="false"/>
+            <endCentered>TARGET_ARROW</endCentered>
+          </style>
+        </edgeMappings>
+
+        <!-- ============ TOOL SECTION ============ -->
+        <toolSections name="Edition">
+
+          <ownedTools xsi:type="tool:NodeCreationDescription" name="Create Component"
+              label="Component"
+              nodeMappings="//@ownedViewpoints[name='uk.ac.york.cs.eng2.rcl.viewpoint']/@ownedRepresentations[name='RCL%20Diagram']/@defaultLayer/@nodeMappings[name='ComponentNode']">
+            <variable name="container"/>
+            <viewVariable name="containerView"/>
+            <initialOperation>
+              <firstModelOperations xsi:type="tool_1:CreateInstance"
+                  typeName="rcl::Component"
+                  referenceName="components"
+                  variableName="newComponent">
+                <subModelOperations xsi:type="tool_1:SetValue" featureName="name" valueExpression="NewComponent"/>
+              </firstModelOperations>
+            </initialOperation>
+          </ownedTools>
+
+          <ownedTools xsi:type="tool:NodeCreationDescription" name="Create Topic"
+              label="Topic"
+              nodeMappings="//@ownedViewpoints[name='uk.ac.york.cs.eng2.rcl.viewpoint']/@ownedRepresentations[name='RCL%20Diagram']/@defaultLayer/@nodeMappings[name='TopicNode']">
+            <variable name="container"/>
+            <viewVariable name="containerView"/>
+            <initialOperation>
+              <firstModelOperations xsi:type="tool_1:CreateInstance"
+                  typeName="rcl::Topic"
+                  referenceName="topics"
+                  variableName="newTopic">
+                <subModelOperations xsi:type="tool_1:SetValue" featureName="name" valueExpression="new.topic"/>
+                <subModelOperations xsi:type="tool_1:CreateInstance"
+                    typeName="rcl::Slot" referenceName="slots" variableName="newSlot">
+                  <subModelOperations xsi:type="tool_1:SetValue" featureName="name" valueExpression="value"/>
+                  <subModelOperations xsi:type="tool_1:SetValue" featureName="type" valueExpression="aql:rcl::SlotType::string"/>
+                </subModelOperations>
+              </firstModelOperations>
+            </initialOperation>
+          </ownedTools>
+
+          <ownedTools xsi:type="tool:EdgeCreationDescription" name="Create Produces"
+              label="produces"
+              edgeMappings="//@ownedViewpoints[name='uk.ac.york.cs.eng2.rcl.viewpoint']/@ownedRepresentations[name='RCL%20Diagram']/@defaultLayer/@edgeMappings[name='ProducesEdge']">
+            <sourceVariable name="source"/>
+            <targetVariable name="target"/>
+            <sourceViewVariable name="sourceView"/>
+            <targetViewVariable name="targetView"/>
+            <initialOperation>
+              <firstModelOperations xsi:type="tool_1:ChangeContext" browseExpression="var:source">
+                <subModelOperations xsi:type="tool_1:SetValue" featureName="produces" valueExpression="aql:source.produces->including(target)"/>
+              </firstModelOperations>
+            </initialOperation>
+          </ownedTools>
+
+          <ownedTools xsi:type="tool:EdgeCreationDescription" name="Create Topic Trigger"
+              label="triggers"
+              edgeMappings="//@ownedViewpoints[name='uk.ac.york.cs.eng2.rcl.viewpoint']/@ownedRepresentations[name='RCL%20Diagram']/@defaultLayer/@edgeMappings[name='TriggersEdge']">
+            <sourceVariable name="source"/>
+            <targetVariable name="target"/>
+            <sourceViewVariable name="sourceView"/>
+            <targetViewVariable name="targetView"/>
+            <initialOperation>
+              <firstModelOperations xsi:type="tool_1:ChangeContext" browseExpression="var:target">
+                <subModelOperations xsi:type="tool_1:CreateInstance"
+                    typeName="rcl::TopicTrigger"
+                    referenceName="triggers"
+                    variableName="newTrigger">
+                  <subModelOperations xsi:type="tool_1:SetValue" featureName="topic" valueExpression="var:source"/>
+                </subModelOperations>
+              </firstModelOperations>
+            </initialOperation>
+          </ownedTools>
+
+          <ownedTools xsi:type="tool:DeleteElementDescription" name="Delete Element">
+            <element name="element"/>
+            <elementView name="elementView"/>
+            <containerView name="containerView"/>
+            <initialOperation>
+              <firstModelOperations xsi:type="tool_1:RemoveElement"/>
+            </initialOperation>
+          </ownedTools>
+
+        </toolSections>
+      </defaultLayer>
+    </ownedRepresentations>
+  </ownedViewpoints>
+
+  <userColorsPalettes name="RCL Palette">
+    <entries xsi:type="description:UserFixedColor" red="173" green="216" blue="230" name="component_fill"/>
+    <entries xsi:type="description:UserFixedColor" red="60"  green="60"  blue="60"  name="border"/>
+    <entries xsi:type="description:UserFixedColor" red="255" green="228" blue="181" name="topic_fill"/>
+    <entries xsi:type="description:UserFixedColor" red="0"   green="120" blue="0"   name="produces_stroke"/>
+    <entries xsi:type="description:UserFixedColor" red="0"   green="60"  blue="180" name="triggers_stroke"/>
+  </userColorsPalettes>
+</description:Group>

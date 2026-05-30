@@ -1,0 +1,64 @@
+package [%=basePackage%].consumers;
+
+import io.micronaut.configuration.kafka.annotation.KafkaListener;
+import io.micronaut.configuration.kafka.annotation.OffsetReset;
+import io.micronaut.configuration.kafka.annotation.Topic;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import [%=basePackage%].dto.[%=dtoName%];
+import uk.ac.york.eng2.reactive.util.TopicSlotService;
+[% for (c in consumers) { %]
+import [%=basePackage%].activations.[%=c.name%]Activation;
+[% } %]
+
+/**
+ * Auto-generated Kafka consumer for topic <code>[%=topic.name%]</code>.
+ *
+ * For every record received it:
+ *   1. Persists every slot value into the RCM database (topic_slot table) via
+ *      {@link TopicSlotService}.
+ *   2. Requests the triggering of each reactive component that depends on this
+ *      topic. The component decides for itself whether all of its inputs are
+ *      available - the consumer never blocks on missing inputs.
+ *
+ * Regenerated from the RCL model: do not edit by hand. To customise behaviour,
+ * implement the matching <Component>Activation class - the generator never
+ * touches that file.
+ */
+@Singleton
+@KafkaListener(groupId = "[%=groupId%]", offsetReset = OffsetReset.EARLIEST)
+public class [%=className%] {
+
+    @Inject
+    private TopicSlotService slotService;
+[% for (c in consumers) { %]
+
+    @Inject
+    private [%=c.name%]Activation [%=c.name.firstToLowerCase()%];
+[% } %]
+
+    @Topic("[%=topic.name%]")
+    public void consume([%=dtoName%] record) {
+        // ----- Persist slot values -----
+[%
+var op;
+var getter;
+for (slot in topic.slots) {
+    op = "saveText";
+    if (slot.type = SlotType#timestamp) { op = "saveTimestamp"; }
+    if (slot.type = SlotType#double) { op = "saveDouble"; }
+    if (slot.type = SlotType#long_) { op = "saveLong"; }
+    if (slot.type = SlotType#integer) { op = "saveLong"; }
+    getter = "get" + slot.name.firstToUpperCase();
+%]
+        if (record.[%=getter%]() != null) {
+            slotService.[%=op%]("[%=topic.name%]", "[%=slot.name%]", record.[%=getter%]());
+        }
+[% } %]
+
+        // ----- Request triggering of dependent reactive components -----
+[% for (c in consumers) { %]
+        [%=c.name.firstToLowerCase()%].onTrigger(record);
+[% } %]
+    }
+}

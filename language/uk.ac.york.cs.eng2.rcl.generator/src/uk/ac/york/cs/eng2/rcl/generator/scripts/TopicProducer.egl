@@ -1,0 +1,20 @@
+package [%=basePackage%].producers;
+
+import io.micronaut.configuration.kafka.annotation.KafkaClient;
+import io.micronaut.configuration.kafka.annotation.KafkaKey;
+import io.micronaut.configuration.kafka.annotation.Topic;
+import [%=basePackage%].dto.[%=dtoName%];
+
+/**
+ * Auto-generated Kafka producer for topic <code>[%=topic.name%]</code>.
+ * Regenerated from the RCL model: do not edit by hand.
+ */
+@KafkaClient(id = "[%=topic.name%]-producer")
+public interface [%=className%] {
+
+    @Topic("[%=topic.name%]")
+    void publish(
+        @KafkaKey String key,
+        [%=dtoName%] record
+    );
+}

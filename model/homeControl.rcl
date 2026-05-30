@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<r:Model xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:r="http://cs.york.ac.uk/eng2/rcl">
+  <components name="AgileRatesFetcher" produces="//@topics.0">
+    <triggers xsi:type="r:TimeTrigger">
+      <period value="12" unit="hours"/>
+    </triggers>
+  </components>
+  <components name="CurrentRateExtractor" produces="//@topics.1 //@topics.2">
+    <triggers xsi:type="r:TopicTrigger" topic="//@topics.0"/>
+    <triggers xsi:type="r:TimeTrigger">
+      <period value="30" unit="minutes"/>
+    </triggers>
+  </components>
+  <components name="BatteryDecisionMaker" produces="//@topics.3">
+    <triggers xsi:type="r:TopicTrigger" topic="//@topics.1"/>
+    <triggers xsi:type="r:TopicTrigger" topic="//@topics.2"/>
+  </components>
+  <components name="BatteryActuatorController">
+    <triggers xsi:type="r:TopicTrigger" topic="//@topics.3"/>
+  </components>
+  <topics name="agile.rates">
+    <slots name="json" type="string"/>
+    <slots name="validFrom" type="timestamp"/>
+    <slots name="validTo" type="timestamp"/>
+  </topics>
+  <topics name="current.import.rate">
+    <slots name="rate" type="double"/>
+  </topics>
+  <topics name="current.export.rate">
+    <slots name="rate" type="double"/>
+  </topics>
+  <topics name="battery.decision">
+    <slots name="targetState" type="string"/>
+  </topics>
+</r:Model>

@@ -1,0 +1,136 @@
+name: eng2-home-automation
+
+services:
+  # ---------------------------------------------------------------------------
+  # Shared infrastructure
+  # ---------------------------------------------------------------------------
+  kafka:
+    image: apache/kafka:3.9.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    restart: unless-stopped
+
+  iot-db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: iot
+      MARIADB_USER: iot
+      MARIADB_PASSWORD: iotpass
+      MARIADB_ROOT_PASSWORD: rootpass
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  reactive-db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: reactive
+      MARIADB_USER: reactive
+      MARIADB_PASSWORD: reactivepass
+      MARIADB_ROOT_PASSWORD: rootpass
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Microservices
+  # ---------------------------------------------------------------------------
+  rates:
+    image: rates:latest
+    environment:
+      # The rates project hard-codes port 8082 in application.properties; override it
+      # to 8080 so the container is consistent with the healthcheck, the port mapping
+      # and the URL that RCM uses (http://rates:8080).
+      MICRONAUT_SERVER_PORT: "8080"
+    ports:
+      - "8082:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  iot:
+    image: iot:latest
+    depends_on:
+      iot-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      MICRONAUT_SERVER_PORT: "8080"
+      DATASOURCES_IOT_URL: jdbc:mariadb://iot-db:3306/iot
+      DATASOURCES_IOT_USERNAME: iot
+      DATASOURCES_IOT_PASSWORD: iotpass
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      HEATERS_SIMULATION_ENABLED: "true"
+      HEATERS_SIMULATION_RATE: "10s"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/rooms >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    restart: unless-stopped
+
+  reactive:
+    image: reactive:latest
+    depends_on:
+      reactive-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      iot:
+        condition: service_healthy
+      rates:
+        condition: service_healthy
+    environment:
+      MICRONAUT_SERVER_PORT: "8081"
+      DATASOURCES_REACTIVE_URL: jdbc:mariadb://reactive-db:3306/reactive
+      DATASOURCES_REACTIVE_USERNAME: reactive
+      DATASOURCES_REACTIVE_PASSWORD: reactivepass
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MICRONAUT_HTTP_SERVICES_IOT_URL: http://iot:8080
+      MICRONAUT_HTTP_SERVICES_RATES_URL: http://rates:8080
+      MICRONAUT_HTTP_SERVICES_RATES_PATH: /
+      REACTIVE_AGILE_FETCH_FIXED_DELAY: "1h"
+      REACTIVE_RATE_EXTRACT_FIXED_DELAY: "5m"
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/components >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    restart: unless-stopped

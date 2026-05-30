@@ -1,0 +1,180 @@
+// --------------------------------------------------------------------------
+// EVL constraints for the Reactive Component Language (RCL)
+//
+// These rules cover the validation properties listed in Section 1.2 of the
+// assessment brief that cannot be (fully) expressed inside the Ecore
+// metamodel itself.
+// --------------------------------------------------------------------------
+
+// Helpers ------------------------------------------------------------------
+
+operation String matchesJavaIdentifier() : Boolean {
+    return self.matches('^[A-Za-z_]+$');
+}
+
+operation String matchesTopicName() : Boolean {
+    return self.matches('^[A-Za-z_.]+$');
+}
+
+// Recursive cycle detection: starting from a component, walk through every topic
+// it produces, then through every component triggered by any of those topics, and
+// so on. If we ever come back to the starting component, we have found a cycle.
+operation Component reachesItselfVia(visited : Set) : Boolean {
+    var nextComponents = self.produces
+        .collect(t | Component.all.select(c | c.triggers
+            .select(tr | tr.isKindOf(TopicTrigger))
+            .exists(tt | tt.topic = t))).flatten().asSet();
+    for (next in nextComponents) {
+        if (next = self) {
+            return true;
+        }
+        if (not visited.includes(next)) {
+            visited.add(next);
+            if (next.reachesItselfVia(visited)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Component constraints -----------------------------------------------------
+
+context Component {
+
+    constraint HasName {
+        check: self.name.isDefined() and self.name.length() > 0
+        message: 'Component must have a name'
+    }
+
+    constraint UniqueName {
+        guard: self.satisfies('HasName')
+        check: Component.all.select(c | c.name = self.name).size() = 1
+        message: 'Duplicate component name: ' + self.name
+    }
+
+    constraint ValidIdentifier {
+        guard: self.satisfies('HasName')
+        check: self.name.matchesJavaIdentifier()
+        message: 'Component name "' + self.name + '" must only contain ASCII letters and underscores'
+    }
+
+    constraint HasTrigger {
+        check: self.triggers.size() > 0
+        message: 'Component "' + self.name + '" must have at least one trigger'
+    }
+}
+
+// Topic constraints ---------------------------------------------------------
+
+context Topic {
+
+    constraint HasName {
+        check: self.name.isDefined() and self.name.length() > 0
+        message: 'Topic must have a name'
+    }
+
+    constraint UniqueName {
+        guard: self.satisfies('HasName')
+        check: Topic.all.select(t | t.name = self.name).size() = 1
+        message: 'Duplicate topic name: ' + self.name
+    }
+
+    constraint ValidTopicName {
+        guard: self.satisfies('HasName')
+        check: self.name.matchesTopicName()
+        message: 'Topic name "' + self.name + '" must only contain ASCII letters, underscores and periods'
+    }
+
+    constraint HasBodySlot {
+        check: self.slots.exists(s | s.part = SlotPart#body)
+        message: 'Topic "' + self.name + '" must have at least one body slot'
+    }
+
+    constraint UniqueSlotNames {
+        check {
+            for (s in self.slots) {
+                if (self.slots.select(o | o.name = s.name).size() > 1) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        message: 'Topic "' + self.name + '" has duplicate slot names'
+    }
+
+    constraint InvolvedInComponent {
+        check {
+            var triggered = Component.all.exists(c | c.triggers
+                .select(t | t.isKindOf(TopicTrigger))
+                .exists(t | t.topic = self));
+            var produced = Component.all.exists(c | c.produces.includes(self));
+            return triggered or produced;
+        }
+        message: 'Topic "' + self.name + '" is not involved with any reactive component'
+    }
+
+    // Cycle detection runs once per topic in the model (any topic in the cycle
+    // would flag it). The detector recursively follows component->produces->topic.
+    constraint NoCycle {
+        check {
+            var producingComponents = Component.all.select(c | c.produces.includes(self));
+            for (c in producingComponents) {
+                if (c.reachesItselfVia(Set { c })) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        message: 'Topic "' + self.name + '" participates in a component-topic cycle'
+    }
+}
+
+// Slot constraints ----------------------------------------------------------
+
+context Slot {
+
+    constraint HasName {
+        check: self.name.isDefined() and self.name.length() > 0
+        message: 'Slot must have a name'
+    }
+
+    constraint HasType {
+        check: self.type.isDefined()
+        message: 'Slot "' + self.name + '" must have a type'
+    }
+
+    constraint ValidIdentifier {
+        guard: self.satisfies('HasName')
+        check: self.name.matchesJavaIdentifier()
+        message: 'Slot name "' + self.name + '" must only contain ASCII letters and underscores'
+    }
+}
+
+// Trigger constraints -------------------------------------------------------
+
+context TimeTrigger {
+    constraint HasPeriod {
+        check: self.period.isDefined()
+        message: 'Time-based trigger must specify a period'
+    }
+
+    constraint PeriodHasUnit {
+        guard: self.satisfies('HasPeriod')
+        check: self.period.unit.isDefined()
+        message: 'Time-based trigger period must specify a unit'
+    }
+
+    constraint PeriodHasPositiveValue {
+        guard: self.satisfies('HasPeriod')
+        check: self.period.value > 0
+        message: 'Time-based trigger period value must be positive'
+    }
+}
+
+context TopicTrigger {
+    constraint HasTopic {
+        check: self.topic.isDefined()
+        message: 'Topic trigger must reference a topic'
+    }
+}
